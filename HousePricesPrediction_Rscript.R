@@ -25,37 +25,40 @@ test2 <- test[colnames(test) %in% colnames(train_rm_col_200_2)]
 imputed_test2 <- knnImputation(test2) 
 
 #Imputation for the train data
-train_rm_na_obser <- knnImputation(train_rm_col_200)
+imputed_train <- knnImputation(train_rm_col_200)
 
-#THE DATA: train_price   train_rm_na_obser_noPrice   imputed_test2
+#THE DATA:   imputed_train   imputed_test2
 
-
-
-k_fold <- 5
-train_rm_na_obser$Id <- sample(1:k_fold, 
-                                       nrow(train_rm_na_obser_noPrice), 
-                                       replace = TRUE)
-
-prediction <- data.frame()
-testsetCopy <- data.frame()
-
-for(i in 1:k_fold){
-    #useful in other place
-    train_set <- train_rm_na_obser[!(train_rm_na_obser$Id==i),]
-    test_set <- train_rm_na_obser[train_rm_na_obser$Id==i,]
-    test_set$SalePrice <- NULL
     
-    rf_model <- randomForest(SalePrice ~ .,
-                             data = train_set)
-    
-    #predict
-    temp <- as.data.frame(predict(rf_model, test_set))
-    prediction <- rbind(prediction, temp)
-    
-    #order the label of test data
-    temp2 <- as.data.frame(train_rm_na_obser$SalePrice[train_rm_na_obser$Id==i])
-    testsetCopy <- rbind(testsetCopy, temp2)
-    
-    #error
-    err <- mse(prediction, testsetCopy)
-}
+rf_model <- randomForest(SalePrice ~ .,
+                        data = imputed_train)
+
+###############################debug:########################################
+#bug:Error in predict.randomForest(rf_model, imputed_test2) : 
+#Type of predictors in new data do not match that of the training data.
+
+#reference:https://stackoverflow.com/questions/24829674/r-random-forest-error-type-of-predictors-in-new-data-do-not-match
+
+#train_factorCols_logi <- sapply(imputed_train, is.factor)
+#train_factor_df <- data.frame(imputed_train[train_factorCols_logi])
+#train_factor_levels <- sapply(train_factor_df, levels)
+
+#factor_count <- 0
+#for(i in 1:ncol(imputed_test2)){
+#    if(is.factor(imputed_test2[i])){
+#        factor_count <- factor_count + 1
+#        levels(imputed_test2[i]) <- train_factor_levels[factor_count]
+#    }
+#}
+#######above didn't work#######
+
+imputed_train_2 <- imputed_train
+imputed_train_2$SalePrice <- NULL
+imputed_test2 <- rbind(imputed_train_2[1, ], imputed_test2)
+imputed_test2 <- imputed_test2[-1,]
+################################################################################
+
+y_pred <- predict(rf_model, imputed_test2)
+
+y_pred_df <- data.frame(y_pred)
+write.csv(y_pred_df, "submission_3.csv")
