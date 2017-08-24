@@ -28,37 +28,21 @@ imputed_test2 <- knnImputation(test2)
 imputed_train <- knnImputation(train_rm_col_200)
 
 #THE DATA:   imputed_train   imputed_test2
+imputed_train_drop_price <- imputed_train
+imputed_train_drop_price$SalePrice <- NULL
+df_all <- rbind(imputed_train_drop_price, imputed_test2)
+df_all_sparse_matrix <- sparse.model.matrix(~., data=df_all)
+train_sparse_matrix_2 <- df_all_sparse_matrix[imputed_train$Id,]
+test_sparse_matrix_2 <- df_all_sparse_matrix[(nrow(imputed_train)+1):(nrow(df_all)),] #bug here
 
-    
-rf_model <- randomForest(SalePrice ~ .,
-                        data = imputed_train)
+xgb <- xgboost(data = data.matrix(train_sparse_matrix_2), 
+               label = imputed_train$SalePrice,
+               objective="reg:linear",
+               nround=25)
 
-###############################debug:########################################
-#bug:Error in predict.randomForest(rf_model, imputed_test2) : 
-#Type of predictors in new data do not match that of the training data.
 
-#reference:https://stackoverflow.com/questions/24829674/r-random-forest-error-type-of-predictors-in-new-data-do-not-match
 
-#train_factorCols_logi <- sapply(imputed_train, is.factor)
-#train_factor_df <- data.frame(imputed_train[train_factorCols_logi])
-#train_factor_levels <- sapply(train_factor_df, levels)
-
-#factor_count <- 0
-#for(i in 1:ncol(imputed_test2)){
-#    if(is.factor(imputed_test2[i])){
-#        factor_count <- factor_count + 1
-#        levels(imputed_test2[i]) <- train_factor_levels[factor_count]
-#    }
-#}
-#######above didn't work#######
-
-imputed_train_2 <- imputed_train
-imputed_train_2$SalePrice <- NULL
-imputed_test2 <- rbind(imputed_train_2[1, ], imputed_test2)
-imputed_test2 <- imputed_test2[-1,]
-################################################################################
-
-y_pred <- predict(rf_model, imputed_test2)
+y_pred <- predict(xgb, test_sparse_matrix_2)
 
 y_pred_df <- data.frame(y_pred)
-write.csv(y_pred_df, "submission_3.csv")
+write.csv(y_pred_df, "submission_4.csv")
